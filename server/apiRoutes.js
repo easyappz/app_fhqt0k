@@ -11,9 +11,25 @@ const UserSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   name: { type: String, required: true },
+  points: { type: Number, default: 100 },
 });
 
 const User = mongoose.model('User', UserSchema);
+
+// Photo model
+const PhotoSchema = new mongoose.Schema({
+  url: { type: String, required: true },
+  uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  isActive: { type: Boolean, default: true },
+  gender: { type: String, enum: ['male', 'female', 'other'] },
+  age: { type: Number },
+  ratings: [{
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    score: { type: Number },
+  }],
+});
+
+const Photo = mongoose.model('Photo', PhotoSchema);
 
 // Middleware to verify JWT
 const verifyToken = (req, res, next) => {
@@ -29,97 +45,103 @@ const verifyToken = (req, res, next) => {
   }
 };
 
-// Registration
-router.post('/register', async (req, res) => {
+// Existing routes...
+
+// Upload new photo
+router.post('/photos', verifyToken, async (req, res) => {
   try {
-    const { email, password, name } = req.body;
-
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ error: 'User already exists' });
-    }
-
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    const user = new User({
-      email,
-      password: hashedPassword,
-      name,
+    const { url, gender, age } = req.body;
+    const photo = new Photo({
+      url,
+      uploadedBy: req.user._id,
+      gender,
+      age,
     });
-
-    await user.save();
-
-    res.status(201).json({ message: 'User registered successfully' });
+    await photo.save();
+    res.status(201).json({ message: 'Photo uploaded successfully', photo });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Login
-router.post('/login', async (req, res) => {
+// Add photo to rating list
+router.post('/photos/:id/activate', verifyToken, async (req, res) => {
   try {
-    const { email, password } = req.body;
-
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(400).json({ error: 'Invalid email or password' });
+    const photo = await Photo.findById(req.params.id);
+    if (!photo) {
+      return res.status(404).json({ error: 'Photo not found' });
     }
-
-    const validPassword = await bcrypt.compare(password, user.password);
-    if (!validPassword) {
-      return res.status(400).json({ error: 'Invalid email or password' });
+    if (photo.uploadedBy.toString() !== req.user._id) {
+      return res.status(403).json({ error: 'Not authorized' });
     }
-
-    const token = jwt.sign({ _id: user._id }, JWT_SECRET);
-    res.json({ token });
+    photo.isActive = true;
+    await photo.save();
+    res.json({ message: 'Photo activated for rating', photo });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Password reset request
-router.post('/reset-password-request', async (req, res) => {
+// Stop rating for a photo
+router.post('/photos/:id/deactivate', verifyToken, async (req, res) => {
   try {
-    const { email } = req.body;
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+    const photo = await Photo.findById(req.params.id);
+    if (!photo) {
+      return res.status(404).json({ error: 'Photo not found' });
     }
-    // Here you would typically send an email with a reset link
-    // For this example, we'll just return a success message
-    res.json({ message: 'Password reset link sent to email' });
+    if (photo.uploadedBy.toString() !== req.user._id) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+    photo.isActive = false;
+    await photo.save();
+    res.json({ message: 'Photo deactivated from rating', photo });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Get user profile
-router.get('/profile', verifyToken, async (req, res) => {
+// Get photo statistics
+router.get('/photos/:id/stats', verifyToken, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select('-password');
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+    const photo = await Photo.findById(req.params.id);
+    if (!photo) {
+      return res.status(404).json({ error: 'Photo not found' });
     }
-    res.json(user);
+    if (photo.uploadedBy.toString() !== req.user._id) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+    const totalRatings = photo.ratings.length;
+    const averageScore = photo.ratings.reduce((acc, curr) => acc + curr.score, 0) / totalRatings;
+    res.json({ totalRatings, averageScore });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Update user profile
-router.put('/profile', verifyToken, async (req, res) => {
+// Get random photo for rating
+router.get('/photos/random', verifyToken, async (req, res) => {
   try {
-    const { name } = req.body;
-    const user = await User.findByIdAndUpdate(
-      req.user._id,
-      { name },
-      { new: true }
-    ).select('-password');
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+    const { gender, minAge, maxAge } = req.query;
+    const user = await User.findById(req.user._id);
+    if (user.points < 1) {
+      return res.status(403).json({ error: 'Not enough points to rate' });
     }
-    res.json(user);
+    const filter = {
+      isActive: true,
+      uploadedBy: { $ne: req.user._id },
+      'ratings.user': { $ne: req.user._id },
+    };
+    if (gender) filter.gender = gender;
+    if (minAge || maxAge) {
+      filter.age = {};
+      if (minAge) filter.age.$gte = parseInt(minAge);
+      if (maxAge) filter.age.$lte = parseInt(maxAge);
+    }
+    const photo = await Photo.findOne(filter).sort({ 'ratings.length': 1 });
+    if (!photo) {
+      return res.status(404).json({ error: 'No photos available for rating' });
+    }
+    res.json(photo);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

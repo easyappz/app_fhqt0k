@@ -1,6 +1,6 @@
 openapi: 3.0.0
 info:
-  title: User API
+  title: User and Photo API
   version: 1.0.0
 
 paths:
@@ -136,9 +136,175 @@ paths:
         '500':
           description: Server error
 
+  /api/photos:
+    post:
+      summary: Upload a new photo
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                url:
+                  type: string
+                gender:
+                  type: string
+                  enum: [male, female, other]
+                age:
+                  type: number
+      responses:
+        '201':
+          description: Photo uploaded successfully
+        '401':
+          description: Unauthorized
+        '500':
+          description: Server error
+
+  /api/photos/{id}/activate:
+    post:
+      summary: Activate photo for rating
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Photo activated for rating
+        '401':
+          description: Unauthorized
+        '403':
+          description: Not authorized
+        '404':
+          description: Photo not found
+        '500':
+          description: Server error
+
+  /api/photos/{id}/deactivate:
+    post:
+      summary: Deactivate photo from rating
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Photo deactivated from rating
+        '401':
+          description: Unauthorized
+        '403':
+          description: Not authorized
+        '404':
+          description: Photo not found
+        '500':
+          description: Server error
+
+  /api/photos/{id}/stats:
+    get:
+      summary: Get photo statistics
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Photo statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalRatings:
+                    type: number
+                  averageScore:
+                    type: number
+        '401':
+          description: Unauthorized
+        '403':
+          description: Not authorized
+        '404':
+          description: Photo not found
+        '500':
+          description: Server error
+
+  /api/photos/random:
+    get:
+      summary: Get random photo for rating
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: gender
+          schema:
+            type: string
+            enum: [male, female, other]
+        - in: query
+          name: minAge
+          schema:
+            type: number
+        - in: query
+          name: maxAge
+          schema:
+            type: number
+      responses:
+        '200':
+          description: Random photo for rating
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Photo'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Not enough points to rate
+        '404':
+          description: No photos available for rating
+        '500':
+          description: Server error
+
 components:
   securitySchemes:
     BearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+  schemas:
+    Photo:
+      type: object
+      properties:
+        _id:
+          type: string
+        url:
+          type: string
+        uploadedBy:
+          type: string
+        isActive:
+          type: boolean
+        gender:
+          type: string
+          enum: [male, female, other]
+        age:
+          type: number
+        ratings:
+          type: array
+          items:
+            type: object
+            properties:
+              user:
+                type: string
+              score:
+                type: number
