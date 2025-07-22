@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigRandomPhoto, ratePhoto, getUserPoints } from '../api/photoApi';
+import { getRandomPhoto, ratePhoto, getUserPoints } from '../api/photoApi';
+import PhotoFilters from './PhotoFilters';
 import './PhotoRating.css';
 
 const PhotoRating = () => {
@@ -7,11 +8,12 @@ const PhotoRating = () => {
   const [userPoints, setUserPoints] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [filters, setFilters] = useState({});
 
   const fetchRandomPhoto = async () => {
     try {
       setLoading(true);
-      const response = await getRandomPhoto();
+      const response = await getRandomPhoto(filters);
       setPhoto(response.data);
       setError(null);
     } catch (err) {
@@ -33,7 +35,7 @@ const PhotoRating = () => {
   useEffect(() => {
     fetchRandomPhoto();
     fetchUserPoints();
-  }, []);
+  }, [filters]);
 
   const handleRate = async (score) => {
     try {
@@ -45,6 +47,10 @@ const PhotoRating = () => {
     }
   };
 
+  const handleFilterChange = (newFilters) => {
+    setFilters(newFilters);
+  };
+
   if (loading) return <div className="loading">Загрузка...</div>;
   if (error) return <div className="error">{error}</div>;
   if (!photo) return <div className="no-photo">Нет доступных фотографий для оценки</div>;
@@ -52,6 +58,7 @@ const PhotoRating = () => {
   return (
     <div className="photo-rating">
       <h2>Оцените фотографию</h2>
+      <PhotoFilters onFilterChange={handleFilterChange} />
       <div className="photo-container">
         <img src={photo.url} alt="Фото для оценки" className="photo" />
       </div>

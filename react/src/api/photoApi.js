@@ -1,7 +1,7 @@
 import instance from './axios';
 
-export const getRandomPhoto = () => {
-  return instance.get('/api/photos/random');
+export const getRandomPhoto = (filters) => {
+  return instance.get('/api/photos/random', { params: filters });
 };
 
 export const ratePhoto = (photoId, score) => {
