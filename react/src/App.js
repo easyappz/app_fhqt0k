@@ -4,6 +4,7 @@ import ErrorBoundary from './ErrorBoundary';
 import Register from './components/Register';
 import Login from './components/Login';
 import ResetPassword from './components/ResetPassword';
+import UserProfile from './components/UserProfile';
 import './App.css';
 
 function App() {
@@ -15,6 +16,7 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/login" element={<Login />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/profile" element={<UserProfile />} />
           </Routes>
         </div>
       </Router>

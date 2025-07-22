@@ -1,0 +1,59 @@
+.user-profile {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.user-info {
+  background-color: #f0f0f0;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.photo-upload form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.photo-upload input,
+.photo-upload select,
+.photo-upload button {
+  padding: 10px;
+  font-size: 16px;
+}
+
+.photo-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 20px;
+}
+
+.photo-item {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 10px;
+  text-align: center;
+}
+
+.photo-item img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+
+.photo-item button {
+  margin-top: 10px;
+  padding: 5px 10px;
+  background-color: #0056b3;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.photo-item button:hover {
+  background-color: #003d82;
+}
