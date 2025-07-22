@@ -276,6 +276,62 @@ paths:
         '500':
           description: Server error
 
+  /api/photos/{id}/rate:
+    post:
+      summary: Rate a photo
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                score:
+                  type: number
+      responses:
+        '200':
+          description: Photo rated successfully
+        '400':
+          description: Photo is not active for rating or already rated
+        '401':
+          description: Unauthorized
+        '403':
+          description: Not enough points to rate
+        '404':
+          description: Photo not found
+        '500':
+          description: Server error
+
+  /api/user/points:
+    get:
+      summary: Get user points
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User points
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  points:
+                    type: number
+        '401':
+          description: Unauthorized
+        '404':
+          description: User not found
+        '500':
+          description: Server error
+
 components:
   securitySchemes:
     BearerAuth:
@@ -308,3 +364,7 @@ components:
                 type: string
               score:
                 type: number
+        totalRatings:
+          type: number
+        averageScore:
+          type: number

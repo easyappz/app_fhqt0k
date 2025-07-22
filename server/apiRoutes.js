@@ -27,6 +27,8 @@ const PhotoSchema = new mongoose.Schema({
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     score: { type: Number },
   }],
+  totalRatings: { type: Number, default: 0 },
+  averageScore: { type: Number, default: 0 },
 });
 
 const Photo = mongoose.model('Photo', PhotoSchema);
@@ -47,101 +49,56 @@ const verifyToken = (req, res, next) => {
 
 // Existing routes...
 
-// Upload new photo
-router.post('/photos', verifyToken, async (req, res) => {
+// Rate a photo
+router.post('/photos/:id/rate', verifyToken, async (req, res) => {
   try {
-    const { url, gender, age } = req.body;
-    const photo = new Photo({
-      url,
-      uploadedBy: req.user._id,
-      gender,
-      age,
-    });
-    await photo.save();
-    res.status(201).json({ message: 'Photo uploaded successfully', photo });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Add photo to rating list
-router.post('/photos/:id/activate', verifyToken, async (req, res) => {
-  try {
+    const { score } = req.body;
     const photo = await Photo.findById(req.params.id);
-    if (!photo) {
-      return res.status(404).json({ error: 'Photo not found' });
-    }
-    if (photo.uploadedBy.toString() !== req.user._id) {
-      return res.status(403).json({ error: 'Not authorized' });
-    }
-    photo.isActive = true;
-    await photo.save();
-    res.json({ message: 'Photo activated for rating', photo });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Stop rating for a photo
-router.post('/photos/:id/deactivate', verifyToken, async (req, res) => {
-  try {
-    const photo = await Photo.findById(req.params.id);
-    if (!photo) {
-      return res.status(404).json({ error: 'Photo not found' });
-    }
-    if (photo.uploadedBy.toString() !== req.user._id) {
-      return res.status(403).json({ error: 'Not authorized' });
-    }
-    photo.isActive = false;
-    await photo.save();
-    res.json({ message: 'Photo deactivated from rating', photo });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Get photo statistics
-router.get('/photos/:id/stats', verifyToken, async (req, res) => {
-  try {
-    const photo = await Photo.findById(req.params.id);
-    if (!photo) {
-      return res.status(404).json({ error: 'Photo not found' });
-    }
-    if (photo.uploadedBy.toString() !== req.user._id) {
-      return res.status(403).json({ error: 'Not authorized' });
-    }
-    const totalRatings = photo.ratings.length;
-    const averageScore = photo.ratings.reduce((acc, curr) => acc + curr.score, 0) / totalRatings;
-    res.json({ totalRatings, averageScore });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Get random photo for rating
-router.get('/photos/random', verifyToken, async (req, res) => {
-  try {
-    const { gender, minAge, maxAge } = req.query;
     const user = await User.findById(req.user._id);
+
+    if (!photo) {
+      return res.status(404).json({ error: 'Photo not found' });
+    }
+
+    if (!photo.isActive) {
+      return res.status(400).json({ error: 'Photo is not active for rating' });
+    }
+
     if (user.points < 1) {
       return res.status(403).json({ error: 'Not enough points to rate' });
     }
-    const filter = {
-      isActive: true,
-      uploadedBy: { $ne: req.user._id },
-      'ratings.user': { $ne: req.user._id },
-    };
-    if (gender) filter.gender = gender;
-    if (minAge || maxAge) {
-      filter.age = {};
-      if (minAge) filter.age.$gte = parseInt(minAge);
-      if (maxAge) filter.age.$lte = parseInt(maxAge);
+
+    const existingRating = photo.ratings.find(rating => rating.user.toString() === req.user._id);
+    if (existingRating) {
+      return res.status(400).json({ error: 'You have already rated this photo' });
     }
-    const photo = await Photo.findOne(filter).sort({ 'ratings.length': 1 });
-    if (!photo) {
-      return res.status(404).json({ error: 'No photos available for rating' });
+
+    photo.ratings.push({ user: req.user._id, score });
+    photo.totalRatings += 1;
+    photo.averageScore = (photo.averageScore * (photo.totalRatings - 1) + score) / photo.totalRatings;
+
+    user.points -= 1;
+    const photoOwner = await User.findById(photo.uploadedBy);
+    photoOwner.points += 1;
+
+    await Promise;
+    await user.save();
+    await photoOwner.save();
+
+    res.json({ message: 'Photo rated successfully', photo });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get user points
+router.get('/user/points', verifyToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
     }
-    res.json(photo);
+    res.json({ points: user.points });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
